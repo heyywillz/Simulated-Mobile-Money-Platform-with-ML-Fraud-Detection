@@ -5,7 +5,19 @@
 
 import axios from 'axios';
 
-const EXPRESS_BASE_URL = 'http://localhost:5000';
+function resolveBaseUrl() {
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
+  } catch {}
+  return 'http://localhost:5000';
+}
+
+const EXPRESS_BASE_URL = resolveBaseUrl();
 
 let authToken = null;
 

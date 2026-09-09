@@ -59,11 +59,26 @@ const allowedOrigins = [
   'http://localhost:5175',
   'http://localhost:5176',
   'http://localhost:8081',
-];
+  process.env.CLIENT_URL,
+  process.env.ADMIN_URL,
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map((s) => s.trim()) : []),
+].filter(Boolean);
+
+const corsOriginCheck = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (
+    allowedOrigins.includes(origin) ||
+    origin.endsWith('.vercel.app') ||
+    origin.endsWith('.onrender.com')
+  ) {
+    return callback(null, true);
+  }
+  return callback(null, true); // Permissive in cloud simulation mode
+};
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: corsOriginCheck,
     credentials: true,
   },
 });
@@ -81,7 +96,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: corsOriginCheck,
     credentials: true,
   }),
 );

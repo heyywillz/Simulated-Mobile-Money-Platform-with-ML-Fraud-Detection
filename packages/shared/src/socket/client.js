@@ -57,7 +57,19 @@ export class MockSocket {
   }
 }
 
-const BACKEND_WS_URL = 'http://localhost:5000';
+function resolveWsUrl() {
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SOCKET_URL) {
+    return process.env.EXPO_PUBLIC_SOCKET_URL;
+  }
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOCKET_URL) {
+      return import.meta.env.VITE_SOCKET_URL;
+    }
+  } catch {}
+  return 'http://localhost:5000';
+}
+
+const BACKEND_WS_URL = resolveWsUrl();
 
 let adminSocketInstance = null;
 

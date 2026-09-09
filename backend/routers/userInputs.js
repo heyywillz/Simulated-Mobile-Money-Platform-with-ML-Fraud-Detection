@@ -285,8 +285,9 @@ userInputs.post('/', [authUser], async (req, res) => {
         ...new_container,
       };
 
+      const mlUrl = process.env.ML_ENGINE_URL || process.env.URL || 'http://localhost:8000/';
       response = await axios.post(
-        process.env.URL || 'http://localhost:8000/',
+        mlUrl,
         mlPayload,
         {
           headers: {

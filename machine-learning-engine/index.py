@@ -13,4 +13,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+@app.get("/status")
+def health_check():
+    return {"status": "healthy", "service": "Fraud Detection ML API", "version": "1.0.0"}
+
 app.include_router(user)
