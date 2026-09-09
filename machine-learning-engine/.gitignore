@@ -1,0 +1,15 @@
+# Python virtual environment
+
+fastApi_env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment variables / secrets
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/

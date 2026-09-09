@@ -40,297 +40,11 @@ class SimEventEmitter {
 
 export const simEvents = new SimEventEmitter();
 
-// Initial Seed Data
-const DEFAULT_USER = {
-  id: 'user_001',
-  fullName: 'Ama Tetteh',
-  phoneNumber: '0241234567',
-  email: 'ama.tetteh@gmail.com',
-  ghanaCardId: 'GHA-729183921-4',
-  pin: '1234',
-  createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
-  status: 'active',
-  kycVerified: true,
-  facialScanVerified: true,
-  biometricEnrolled: true,
-};
-
-const DEFAULT_TRANSACTIONS = [
-  {
-    id: 'tx_001',
-    type: 'send',
-    amount: 150,
-    currency: 'GHS',
-    sender: '0241234567',
-    receiver: '0559876543',
-    receiverName: 'Kwesi Appiah',
-    reference: 'Market groceries',
-    status: 'completed',
-    mlScore: 0.08,
-    mlRiskLevel: 'low',
-    deviceProfile: {
-      deviceId: 'dev_web_001',
-      fingerprint: 'fp_sample',
-      platform: 'web',
-      registeredAt: new Date().toISOString(),
-    },
-    location: {
-      latitude: 5.6037,
-      longitude: -0.187,
-      city: 'Accra',
-      region: 'Greater Accra',
-      country: 'Ghana',
-      capturedAt: new Date().toISOString(),
-    },
-    authLayersPassed: ['pin'],
-    createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
-  },
-  {
-    id: 'tx_002',
-    type: 'cash_in',
-    amount: 500,
-    currency: 'GHS',
-    sender: '0240001122',
-    receiver: '0241234567',
-    receiverName: 'Bank Deposit Top-up',
-    reference: 'ATM Cash-in',
-    status: 'completed',
-    mlScore: 0.12,
-    mlRiskLevel: 'low',
-    deviceProfile: {
-      deviceId: 'dev_web_001',
-      fingerprint: 'fp_sample',
-      platform: 'web',
-      registeredAt: new Date().toISOString(),
-    },
-    location: {
-      latitude: 5.6037,
-      longitude: -0.187,
-      city: 'Accra',
-      region: 'Greater Accra',
-      country: 'Ghana',
-      capturedAt: new Date().toISOString(),
-    },
-    authLayersPassed: ['pin'],
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-  },
-  {
-    id: 'tx_003',
-    type: 'pay_bill',
-    amount: 85,
-    currency: 'GHS',
-    sender: '0241234567',
-    receiver: 'ECG Prepaid',
-    receiverName: 'ECG Ghana Electricity',
-    reference: 'Meter #492819',
-    status: 'completed',
-    mlScore: 0.05,
-    mlRiskLevel: 'low',
-    deviceProfile: {
-      deviceId: 'dev_web_001',
-      fingerprint: 'fp_sample',
-      platform: 'web',
-      registeredAt: new Date().toISOString(),
-    },
-    location: {
-      latitude: 5.6037,
-      longitude: -0.187,
-      city: 'Accra',
-      region: 'Greater Accra',
-      country: 'Ghana',
-      capturedAt: new Date().toISOString(),
-    },
-    authLayersPassed: ['pin'],
-    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-  },
-  {
-    id: 'tx_flag_001',
-    type: 'send',
-    amount: 4500,
-    currency: 'GHS',
-    sender: '0241234567',
-    receiver: '0551234567',
-    receiverName: 'Abena Owusu',
-    reference: 'Emergency transfer',
-    status: 'flagged',
-    mlScore: 0.94,
-    mlRiskLevel: 'critical',
-    reason: 'Unusual amount and location anomaly for account',
-    caseId: 'CASE-ATOD-8812',
-    deviceProfile: {
-      deviceId: 'dev_unknown_999',
-      fingerprint: 'fp_unknown',
-      platform: 'web',
-      registeredAt: new Date().toISOString(),
-    },
-    location: {
-      latitude: 9.4008,
-      longitude: -0.8393,
-      city: 'Tamale',
-      region: 'Northern',
-      country: 'Ghana',
-      capturedAt: new Date().toISOString(),
-    },
-    authLayersPassed: ['pin'],
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-  },
-];
-
-const DEFAULT_CASES = [
-  {
-    id: 'CASE-ATOD-8812',
-    transactionId: 'tx_flag_001',
-    userId: 'user_001',
-    userName: 'Ama Tetteh',
-    userPhone: '0241234567',
-    detectionType: 'atod',
-    riskLevel: 'critical',
-    status: 'open',
-    transaction: DEFAULT_TRANSACTIONS[3],
-    signals: [
-      {
-        type: 'new_device',
-        label: 'Unrecognized Device Fingerprint',
-        description: 'Login from hardware footprint never seen on account',
-        score: 0.88,
-        details: { deviceId: 'dev_unknown_999' },
-      },
-      {
-        type: 'ml_score',
-        label: 'ML Fraud Risk Score',
-        description: 'Machine learning model flagged this transaction with 94% fraud probability',
-        score: 0.94,
-        details: { model: 'fraud_detection_v1', threshold: 0.7 },
-      },
-      {
-        type: 'new_location',
-        label: 'Geographical Telemetry Jump',
-        description: 'Transfer initiated from Tamale (600km from primary Accra hub)',
-        score: 0.79,
-        details: { city: 'Tamale' },
-      },
-      {
-        type: 'unusual_amount',
-        label: 'Sudden High Volume Outflow',
-        description: 'Amount GH₵4,500 exceeds normal transaction baseline (GH₵150-500)',
-        score: 0.94,
-        details: { amount: 4500 },
-      },
-    ],
-    userProfile: {
-      avgTransactionAmount: 180,
-      minTransactionAmount: 10,
-      maxTransactionAmount: 600,
-      typicalTransactionRange: [20, 500],
-      avgDailyTransactions: 2.4,
-      knownDevices: ['dev_web_001'],
-      knownLocations: ['Accra', 'Tema', 'Sunyani'],
-      accountAge: 90,
-      totalTransactions: 34,
-    },
-    analystNotes: [],
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-  },
-  {
-    id: 'CASE-ANOM-9021',
-    transactionId: 'tx_flag_002',
-    userId: 'user_002',
-    userName: 'Kofi Mensah',
-    userPhone: '0551234567',
-    detectionType: 'transaction_anomaly',
-    riskLevel: 'high',
-    status: 'under_review',
-    transaction: {
-      id: 'tx_flag_002',
-      type: 'send',
-      amount: 3800,
-      currency: 'GHS',
-      sender: '0551234567',
-      receiver: '0241234567',
-      receiverName: 'Ama Tetteh',
-      status: 'flagged',
-      mlScore: 0.82,
-      mlRiskLevel: 'critical',
-      reason: 'Velocity spike — 3 transfers in under 2 minutes',
-      caseId: 'CASE-ANOM-9021',
-      deviceProfile: {
-        deviceId: 'dev_002',
-        fingerprint: 'fp_002',
-        platform: 'mobile',
-        registeredAt: new Date().toISOString(),
-      },
-      location: {
-        latitude: 6.6884,
-        longitude: -1.6244,
-        city: 'Kumasi',
-        region: 'Ashanti Region',
-        country: 'Ghana',
-        capturedAt: new Date().toISOString(),
-      },
-      authLayersPassed: ['pin'],
-      createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    },
-    signals: [
-      {
-        type: 'unusual_amount',
-        label: 'Velocity & Burst Spike',
-        description: 'Rapid series of high value transfers',
-        score: 0.91,
-        details: { velocityCount: 3 },
-      },
-      {
-        type: 'ml_score',
-        label: 'ML Fraud Risk Score',
-        description: 'Machine learning model flagged this transaction with 82% fraud probability',
-        score: 0.82,
-        details: { model: 'fraud_detection_v1', threshold: 0.7 },
-      },
-    ],
-    userProfile: {
-      avgTransactionAmount: 220,
-      minTransactionAmount: 30,
-      maxTransactionAmount: 800,
-      typicalTransactionRange: [50, 700],
-      avgDailyTransactions: 1.8,
-      knownDevices: ['dev_002'],
-      knownLocations: ['Kumasi', 'Accra'],
-      accountAge: 140,
-      totalTransactions: 62,
-    },
-    analystNotes: [
-      {
-        id: 'note_001',
-        author: 'Kwame Mensah',
-        content: 'Contacted user via secondary channel for verification.',
-        createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-      },
-    ],
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-  },
-];
-
-const DEFAULT_ALERTS = [
-  {
-    id: 'alert_001',
-    userId: 'user_001',
-    type: 'transaction_flagged',
-    title: 'High-Risk Transaction Flagged',
-    message: 'Transfer of GH₵4,500 to Abena Owusu was flagged for security review.',
-    read: false,
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-  },
-  {
-    id: 'alert_002',
-    userId: 'user_001',
-    type: 'new_location',
-    title: 'New Geo-Location Detected',
-    message: 'Your account was accessed from Tamale, Northern Region.',
-    read: true,
-    createdAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-  },
-];
+/// Empty Initial Defaults - Zero Seed Data
+const DEFAULT_USER = null;
+const DEFAULT_TRANSACTIONS = [];
+const DEFAULT_CASES = [];
+const DEFAULT_ALERTS = [];
 
 // Local Storage Helper
 function getStored(key, fallback) {
@@ -350,20 +64,31 @@ function setStored(key, val) {
   } catch {}
 }
 
+// Clean legacy seed items
+if (typeof localStorage !== 'undefined') {
+  try {
+    const u = localStorage.getItem('momo_sim_user');
+    if (u && (u.includes('user_001') || u.includes('Ama Tetteh') || u.includes('CASE-ATOD-8812'))) {
+      localStorage.removeItem('momo_sim_user');
+      localStorage.removeItem('momo_sim_balance');
+      localStorage.removeItem('momo_sim_transactions');
+      localStorage.removeItem('momo_sim_cases');
+      localStorage.removeItem('momo_sim_alerts');
+    }
+    const c = localStorage.getItem('momo_sim_cases');
+    if (c && c.includes('CASE-ATOD-8812')) {
+      localStorage.removeItem('momo_sim_cases');
+    }
+  } catch {}
+}
+
 export class SimStore {
   constructor() {
-    this.user = getStored('momo_sim_user', DEFAULT_USER);
-    this.balance = getStored('momo_sim_balance', 10000.0);
-    const isDefaultUser = !this.user || this.user.id === 'user_001';
-    this.transactions = getStored(
-      'momo_sim_transactions',
-      isDefaultUser ? DEFAULT_TRANSACTIONS : [],
-    );
-    this.cases = getStored('momo_sim_cases', DEFAULT_CASES);
-    this.alerts = getStored(
-      'momo_sim_alerts',
-      isDefaultUser ? DEFAULT_ALERTS : [],
-    );
+    this.user = getStored('momo_sim_user', null);
+    this.balance = getStored('momo_sim_balance', 0.0);
+    this.transactions = getStored('momo_sim_transactions', []);
+    this.cases = getStored('momo_sim_cases', []);
+    this.alerts = getStored('momo_sim_alerts', []);
   }
 
   static get() {
@@ -549,24 +274,26 @@ export class SimStore {
     const isFlagged = isHighAmount || (amount > 2000 && isAnomalyCity);
 
     const txId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    let status = isFlagged ? 'flagged' : 'completed';
+    let status = isFlagged ? 'blocked' : 'completed';
     let caseId = undefined;
     let reason = undefined;
 
     if (isFlagged) {
       caseId = `CASE-SIM-${Math.floor(1000 + Math.random() * 9000)}`;
       reason = isHighAmount
-        ? 'High value anomaly detected by AI fraud engine'
-        : 'Unusual location & transaction pattern';
+        ? 'Transaction blocked by AI fraud defense: High value anomaly. 0.00 GHS deducted from your balance.'
+        : 'Transaction blocked by AI fraud defense: Unusual location or pattern. 0.00 GHS deducted from your balance.';
     }
 
-    // Adjust balance if not blocked
-    if (isOutflow) {
-      this.balance -= amount;
-    } else if (type === 'cash_in' || type === 'receive') {
-      this.balance += amount;
+    // Adjust balance ONLY if transaction completed successfully (zero deduction on blocked/flagged)
+    if (status === 'completed') {
+      if (isOutflow) {
+        this.balance -= amount;
+      } else if (type === 'cash_in' || type === 'receive') {
+        this.balance += amount;
+      }
+      setStored('momo_sim_balance', this.balance);
     }
-    setStored('momo_sim_balance', this.balance);
 
     const newTx = {
       id: txId,
@@ -648,8 +375,8 @@ export class SimStore {
         id: `alert_${Date.now()}`,
         userId: this.user?.id,
         type: 'transaction_flagged',
-        title: 'Security Anomaly Flagged',
-        message: `Your ${type} of GH₵${amount.toLocaleString()} was flagged for SOC fraud verification.`,
+        title: 'Transaction Blocked by AI Defense',
+        message: `Your ${type} of GH₵${amount.toLocaleString()} was blocked by AI fraud defense. 0.00 GHS was deducted from your wallet.`,
         read: false,
         createdAt: new Date().toISOString(),
       };

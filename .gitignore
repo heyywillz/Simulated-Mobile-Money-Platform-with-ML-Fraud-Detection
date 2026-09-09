@@ -6,6 +6,9 @@ node_modules/
 dist/
 build/
 .output/
+scratch/
+*/scratch/
+**/scratch/**
 
 # Expo / React Native
 .expo/
@@ -38,6 +41,12 @@ Thumbs.db
 .idea/
 *.suo
 *.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.env
+fastApi_env/
+venv/
+.venv/

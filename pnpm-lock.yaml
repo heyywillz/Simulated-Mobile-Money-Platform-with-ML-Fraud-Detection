@@ -15,7 +15,7 @@ importers:
         specifier: ^57.0.10
         version: 57.0.10(@babel/core@7.29.7(supports-color@8.1.1))(@babel/runtime@7.29.7)(expo@57.0.20)(react-refresh@0.17.0)(supports-color@8.1.1)
 
-  apps/admin:
+  frontend/admin:
     dependencies:
       '@momo/shared':
         specifier: workspace:*
@@ -55,7 +55,7 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@26.2.0)(jiti@1.21.7)(lightningcss@1.33.0)(terser@5.50.0)(tsx@4.23.12)(yaml@2.9.0)
 
-  apps/mobile:
+  frontend/mobile:
     dependencies:
       '@expo/metro-runtime':
         specifier: ~57.0.15
@@ -131,7 +131,7 @@ importers:
         specifier: ^57.0.10
         version: 57.0.10(@babel/core@7.29.7(supports-color@8.1.1))(@babel/runtime@7.29.7)(expo@57.0.20)(react-refresh@0.17.0)(supports-color@8.1.1)
 
-  apps/web:
+  frontend/web:
     dependencies:
       '@momo/shared':
         specifier: workspace:*

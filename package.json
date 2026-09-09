@@ -7,6 +7,8 @@
     "dev:web": "pnpm --filter @momo/web dev",
     "dev:admin": "pnpm --filter @momo/admin dev",
     "dev:mobile": "pnpm --filter @momo/mobile start",
+    "dev:backend": "node backend/index.js",
+    "dev:ml": "python -m uvicorn index:app --reload --port 8000 --app-dir machine-learning-engine",
     "dev": "pnpm run dev:web",
     "build:web": "pnpm --filter @momo/web build",
     "build:admin": "pnpm --filter @momo/admin build",

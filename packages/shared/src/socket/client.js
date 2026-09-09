@@ -1,9 +1,9 @@
 /**
- * Client-side Socket emulator.
- * Provides .on, .off, .emit, .disconnect matching Socket.io client API
- * using local simulation events without network requests.
+ * Real Socket.io client connecting to Express backend on http://localhost:5000
+ * with MockSocket fallback if socket server is unreachable.
  */
 
+import { io } from 'socket.io-client';
 import { simEvents } from '../api/store';
 
 export class MockSocket {
@@ -57,16 +57,46 @@ export class MockSocket {
   }
 }
 
-/**
- * Create a client-side simulated socket for end-user apps.
- */
-export function createUserSocket(_token, _sessionId, _wsUrl) {
-  return new MockSocket();
-}
+const BACKEND_WS_URL = 'http://localhost:5000';
+
+let adminSocketInstance = null;
 
 /**
- * Create a client-side simulated socket for the admin portal.
+ * Create or get socket connection for the admin portal.
  */
-export function createAdminSocket(_token, _wsUrl) {
-  return new MockSocket();
+export function createAdminSocket(token, wsUrl = BACKEND_WS_URL) {
+  try {
+    if (!adminSocketInstance || !adminSocketInstance.connected) {
+      adminSocketInstance = io(wsUrl, {
+        transports: ['websocket', 'polling'],
+        withCredentials: true,
+        auth: { token },
+      });
+      console.log('[Socket] Connected admin socket to:', wsUrl);
+    }
+    return adminSocketInstance;
+  } catch (err) {
+    console.warn('[Socket] Connection failed, using fallback:', err);
+    return new MockSocket();
+  }
+}
+
+let userSocketInstance = null;
+
+/**
+ * Create socket connection for user clients.
+ */
+export function createUserSocket(token, sessionId, wsUrl = BACKEND_WS_URL) {
+  try {
+    if (!userSocketInstance || !userSocketInstance.connected) {
+      userSocketInstance = io(wsUrl, {
+        transports: ['websocket', 'polling'],
+        withCredentials: true,
+        auth: { token, sessionId },
+      });
+    }
+    return userSocketInstance;
+  } catch (err) {
+    return new MockSocket();
+  }
 }

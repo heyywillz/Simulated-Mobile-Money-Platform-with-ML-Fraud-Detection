@@ -1,0 +1,9 @@
+node_modules/
+
+
+# Environment variables / secrets
+.env
+.env.*
+
+# IDE
+.vscode/

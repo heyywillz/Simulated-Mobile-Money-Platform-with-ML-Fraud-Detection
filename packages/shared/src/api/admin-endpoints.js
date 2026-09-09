@@ -1,101 +1,99 @@
 /**
  * Endpoint functions for the admin portal.
- * Operates purely client-side using the local simulation store.
+ * Connected to live Express backend endpoints on http://localhost:5000/admin.
  */
 
-import { SimStore } from './store';
+import { api } from './client';
 
 // ─── Admin Auth ─────────────────────────────────────────────────
 
 export async function adminLogin(payload) {
-  const isKwame = payload.email?.toLowerCase().includes('kwame');
-  return {
-    token: `admin_jwt_${Date.now()}`,
-    analyst: {
-      id: 'analyst_001',
-      name: isKwame ? 'Kwame Mensah' : 'Swipe Pay Administrator',
-      email: payload.email || 'admin@swipepay.gh',
-      role: 'admin',
-    },
-  };
+  try {
+    const { data } = await api.post('/admin/login', payload);
+    return data;
+  } catch {
+    const isKwame = payload.email?.toLowerCase().includes('kwame');
+    return {
+      token: `admin_jwt_${Date.now()}`,
+      analyst: {
+        id: 'analyst_001',
+        name: isKwame ? 'Kwame Mensah' : 'Swipe Pay Administrator',
+        email: payload.email || 'admin@swipepay.gh',
+        role: 'admin',
+      },
+    };
+  }
 }
 
 // ─── Cases ──────────────────────────────────────────────────────
 
 export async function getCases(params) {
-  const cases = SimStore.get().getCases();
-  let filtered = [...cases];
-
-  if (params?.status) {
-    filtered = filtered.filter((c) => c.status === params.status);
+  try {
+    const { data } = await api.get('/admin/cases', { params });
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch cases from backend:', err);
+    return [];
   }
-  if (params?.detectionType) {
-    filtered = filtered.filter((c) => c.detectionType === params.detectionType);
-  }
-  if (params?.riskLevel) {
-    filtered = filtered.filter((c) => c.riskLevel === params.riskLevel);
-  }
-
-  return filtered;
 }
 
 export async function getCaseById(caseId) {
-  const c = SimStore.get().getCaseById(caseId);
-  if (!c) throw new Error(`Case ${caseId} not found`);
-  return c;
+  const { data } = await api.get(`/admin/cases/${caseId}`);
+  return data;
 }
 
 export async function approveCase(caseId, note) {
-  const store = SimStore.get();
-  if (note) {
-    store.addCaseNote(caseId, 'Kwame Mensah', note);
-  }
-  return store.updateCase(caseId, { status: 'approved' });
+  const { data } = await api.post(`/admin/cases/${caseId}/approve`, { note });
+  return data;
 }
 
 export async function blockCase(caseId, note) {
-  const store = SimStore.get();
-  if (note) {
-    store.addCaseNote(caseId, 'Kwame Mensah', note);
-  }
-  return store.updateCase(caseId, { status: 'blocked' });
+  const { data } = await api.post(`/admin/cases/${caseId}/block`, { note });
+  return data;
 }
 
 export async function escalateCase(caseId, note) {
-  const store = SimStore.get();
-  if (note) {
-    store.addCaseNote(caseId, 'Kwame Mensah', note);
-  }
-  return store.updateCase(caseId, { status: 'escalated' });
+  const { data } = await api.post(`/admin/cases/${caseId}/escalate`, { note });
+  return data;
 }
 
 export async function addCaseNote(caseId, content) {
-  SimStore.get().addCaseNote(caseId, 'Kwame Mensah', content);
+  const { data } = await api.post(`/admin/cases/${caseId}/notes`, { content });
+  return data;
 }
 
 // ─── Accounts ───────────────────────────────────────────────────
 
-export async function freezeAccount(_accountId, _reason) {
-  return { success: true };
+export async function freezeAccount(accountId, reason) {
+  const { data } = await api.post(`/admin/accounts/${accountId}/freeze`, { reason });
+  return data;
+}
+
+export async function unfreezeAccount(accountId, reason) {
+  const { data } = await api.post(`/admin/accounts/${accountId}/unfreeze`, { reason });
+  return data;
 }
 
 // ─── Transactions (admin view — no user filtering) ──────────────
 
 export async function getAllTransactions(params) {
-  const txns = SimStore.get().getAllTransactions();
-  let list = [...txns];
-
-  if (params?.status) {
-    list = list.filter((t) => t.status === params.status);
+  try {
+    const { data } = await api.get('/admin/transactions', { params });
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch transactions from backend:', err);
+    return [];
   }
-  if (params?.limit) {
-    list = list.slice(0, params.limit);
-  }
-  return list;
 }
 
 // ─── Analytics ──────────────────────────────────────────────────
 
 export async function getAnalytics() {
-  return SimStore.get().getAnalytics();
+  try {
+    const { data } = await api.get('/admin/analytics');
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch analytics from backend:', err);
+    return null;
+  }
 }

@@ -8,7 +8,7 @@
  *   - Everything else (balance, history, alerts, OTP) → local SimStore
  */
 
-import { api } from './client';
+import { api, setAuthToken, getAuthToken } from './client';
 import { SimStore, simEvents } from './store';
 
 // ─── Auth ───────────────────────────────────────────────────────
@@ -57,11 +57,15 @@ export async function signup(payload) {
       lat: payload.location?.latitude ?? 5.6037,
       long: payload.location?.longitude ?? -0.187,
     },
-    device: payload.deviceProfile?.deviceName || payload.deviceProfile?.browserName || 'Web Browser',
+    device:
+      payload.deviceProfile?.deviceId ||
+      payload.deviceProfile?.deviceName ||
+      payload.deviceProfile?.browserName ||
+      'Web Browser',
   };
 
   try {
-    const { data } = await api.post('https://machine-learning-server-3.onrender.com', expressPayload, {
+    const { data } = await api.post('/', expressPayload, {
       withCredentials: true,
     });
 
@@ -106,8 +110,12 @@ export async function signup(payload) {
       localStorage.setItem('momo_user_ghanaCard', expressPayload.ghanaCard);
     }
 
+    if (data.token) {
+      setAuthToken(data.token);
+    }
+
     const sessionId = `sess_${Date.now()}`;
-    const token = `sim_jwt_${Date.now()}`;
+    const token = data.token || `sim_jwt_${Date.now()}`;
 
     return {
       token,
@@ -123,7 +131,13 @@ export async function signup(payload) {
       ],
     };
   } catch (err) {
-    // If Express server fails, fall back to local simulation
+    if (err.response?.status === 400) {
+      const serverMsg = err.response?.data?.message || err.response?.data?.error || 'User already registered with this email or Ghana Card.';
+      const customErr = new Error(serverMsg);
+      customErr.response = err.response;
+      throw customErr;
+    }
+    // If Express server is unreachable (connection refused/offline), fall back to local simulation
     console.warn('Express signup failed, server returned:', err.response?.status, err.response?.data || err.message);
     return signupLocal(payload);
   }
@@ -156,7 +170,11 @@ export async function login(payload) {
   };
 
   try {
-    await api.post('/login', expressPayload, { withCredentials: true, timeout: 3000 });
+    const loginRes = await api.post('/login', expressPayload, { withCredentials: true, timeout: 5000 });
+    const serverToken = loginRes.data?.token;
+    if (serverToken) {
+      setAuthToken(serverToken);
+    }
 
     // Save active credentials in localStorage for subsequent requests
     if (typeof localStorage !== 'undefined') {
@@ -165,53 +183,42 @@ export async function login(payload) {
       localStorage.setItem('momo_user_ghanaCard', expressPayload.ghanaCard);
     }
 
-    // Express login sets jwt cookie; attempt to fetch real user from /user
-    let user = store.getUser();
+    const backendUser = loginRes.data?.user || {};
+    let user = {
+      id: backendUser._id || `user_${Date.now()}`,
+      fullName: backendUser.fullName || payload.fullName || 'Swipe Pay User',
+      phoneNumber: payload.phoneNumber || '0241234567',
+      email: backendUser.email || expressPayload.email,
+      ghanaCardId: backendUser.ghanaCard || expressPayload.ghanaCard,
+      password: expressPayload.password,
+      pin: payload.pin || expressPayload.password,
+      createdAt: new Date().toISOString(),
+      status: 'active',
+      kycVerified: true,
+      facialScanVerified: payload.biometricType === 'facial',
+      biometricEnrolled: payload.biometricType === 'fingerprint' || true,
+    };
+
+    // Attempt to enrich with /user (e.g. balance or additional fields)
     try {
       const userRes = await api.get('/user', { withCredentials: true });
       if (userRes.data) {
-        user = {
-          id: userRes.data._id || `user_${Date.now()}`,
-          fullName: userRes.data.fullName || user?.fullName || 'Ama Tetteh',
-          phoneNumber: payload.phoneNumber || user?.phoneNumber || '0241234567',
-          email: userRes.data.email || expressPayload.email,
-          ghanaCardId: userRes.data.ghanaCard || expressPayload.ghanaCard,
-          password: expressPayload.password,
-          pin: payload.pin || expressPayload.password,
-          createdAt: userRes.data.createdAt || new Date().toISOString(),
-          status: 'active',
-          kycVerified: true,
-          facialScanVerified: payload.biometricType === 'facial',
-          biometricEnrolled: payload.biometricType === 'fingerprint' || true,
-        };
-        store.setUser(user);
+        user.id = userRes.data._id || user.id;
+        user.fullName = userRes.data.fullName || user.fullName;
+        user.email = userRes.data.email || user.email;
+        user.ghanaCardId = userRes.data.ghanaCard || user.ghanaCardId;
         if (typeof userRes.data.balance === 'number') {
           store.setBalance(userRes.data.balance);
         }
       }
     } catch {
-      // If /user fails, build from payload/store
-      if (!user || (payload.email && user.email !== payload.email)) {
-        user = {
-          id: `user_${Date.now()}`,
-          fullName: user?.fullName || 'Ama Tetteh',
-          phoneNumber: payload.phoneNumber || user?.phoneNumber || '0241234567',
-          email: expressPayload.email,
-          ghanaCardId: expressPayload.ghanaCard,
-          password: expressPayload.password,
-          pin: payload.pin || expressPayload.password,
-          createdAt: new Date().toISOString(),
-          status: 'active',
-          kycVerified: true,
-          facialScanVerified: payload.biometricType === 'facial',
-          biometricEnrolled: payload.biometricType === 'fingerprint' || true,
-        };
-        store.setUser(user);
-      }
+      // Non-fatal if /user endpoint fails
     }
 
+    store.setUser(user);
+
     const sessionId = `sess_${Date.now()}`;
-    const token = `sim_jwt_${Date.now()}`;
+    const token = serverToken || `sim_jwt_${Date.now()}`;
 
     return {
       token,
@@ -227,6 +234,12 @@ export async function login(payload) {
       ],
     };
   } catch (err) {
+    if (err.response?.status === 400 || err.response?.status === 404) {
+      const serverMsg = err.response?.data?.message || 'Invalid email, password, or Ghana Card';
+      const customErr = new Error(serverMsg);
+      customErr.response = err.response;
+      throw customErr;
+    }
     console.warn('Express login failed, falling back to local user:', err.message);
     let user = store.getUser();
     if (!user) {
@@ -330,29 +343,31 @@ async function executeTransaction(type, payload) {
   lastTransactionKey = currentKey;
 
   const senderRaw = user?.phoneNumber || '0241234567';
-  const formattedSenderPhone = senderRaw.startsWith('233-')
-    ? senderRaw
-    : `233-${senderRaw.replace(/^\+?233|^0/, '')}`;
+  const cleanSender = String(senderRaw).replace(/^\+?233|^0/, '').replace(/\D/g, '');
+  const formattedSenderPhone = `233-${(cleanSender || '241234567').padEnd(9, '0').slice(0, 9)}`;
 
   const receiverRaw = payload.recipientPhone || payload.receiver || payload.agentCode || payload.merchantCode || '0240000000';
-  const formattedReceiverPhone = receiverRaw.startsWith('233-')
-    ? receiverRaw
-    : `233-${receiverRaw.replace(/^\+?233|^0/, '')}`;
+  const cleanReceiver = String(receiverRaw).replace(/^\+?233|^0/, '').replace(/\D/g, '');
+  const formattedReceiverPhone = `233-${(cleanReceiver || '240000000').padEnd(9, '0').slice(0, 9)}`;
+
+  const normalizedType = type === 'send' ? 'send_money' : type;
 
   // Map to Express server schema:  POST /transaction
-  // { amount, SenderPhone, receiverPhone, reason, city, country, location, device, email }
+  // { amount, SenderPhone, receiverPhone, reason, channel, city, country, location, device, email }
   const expressPayload = {
     amount: payload.amount,
     SenderPhone: formattedSenderPhone,
     receiverPhone: formattedReceiverPhone,
-    reason: type,
+    reason: normalizedType,
+    channel: normalizedType,
+    transactionType: normalizedType,
     city: payload.location?.city || 'Accra',
     country: payload.location?.country || 'Ghana',
     location: {
       lat: payload.location?.latitude ?? 5.6037,
       long: payload.location?.longitude ?? -0.187,
     },
-    device: payload.deviceProfile?.deviceName || payload.deviceProfile?.browserName || 'Web Browser',
+    device: payload.deviceProfile?.deviceId || payload.deviceProfile?.deviceName || payload.deviceProfile?.browserName || 'Web Browser',
     email: storedEmail || user?.email || `${senderRaw}@momo.gh`,
   };
 
@@ -360,27 +375,60 @@ async function executeTransaction(type, payload) {
     const { data } = await api.post('/transaction', expressPayload);
 
     // Extract ML fraud score from server response
-    const rawMlScore = data?.fraud_risk_score ?? data?.prediction ?? data?.detection_score ?? null;
-    const mlScore = typeof rawMlScore === 'number' ? Math.min(Math.max(rawMlScore, 0), 1) : null;
+    const rawMlScore =
+      data?.status?.fraud_risk_score ??
+      data?.fraud_risk_score ??
+      data?.prediction ??
+      data?.detection_score ??
+      null;
+
+    // Normalization based on ML model range [~3.0, ~20.0]:
+    // Raw output <= 3.0 represents 0% baseline risk.
+    // Raw output >= 20.0 represents 100% critical fraud risk.
+    const ML_MIN_SCORE = 3.0;
+    const ML_MAX_SCORE = 20.0;
+    let normalizedScore = null;
+
+    if (typeof rawMlScore === 'number') {
+      if (rawMlScore <= 1.0) {
+        normalizedScore = Math.max(0, Math.min(1, rawMlScore));
+      } else {
+        normalizedScore = Math.max(0, Math.min(1, (rawMlScore - ML_MIN_SCORE) / (ML_MAX_SCORE - ML_MIN_SCORE)));
+      }
+    }
+
+    const mlScore = normalizedScore;
     const mlRiskLevel = mlScore !== null
       ? (mlScore >= 0.8 ? 'critical' : mlScore >= 0.6 ? 'high' : mlScore >= 0.3 ? 'medium' : 'low')
       : null;
 
     // Pass ML data into the local processing so it's stored on the transaction
-    const enrichedPayload = { ...payload, mlScore, mlRiskLevel };
+    const enrichedPayload = { ...payload, mlScore, mlRiskLevel, channel: normalizedType, type: normalizedType };
 
     // Process locally to track balance and history
     const result = store.processTransaction(type, enrichedPayload);
     const txId = result.transactionId || result.transaction?.id;
 
-    // If ML score indicates fraud on a transaction that was locally marked completed, upgrade it
-    if (mlScore !== null && mlScore >= 0.7 && result.transaction?.status === 'completed' && txId) {
+    // If ML score indicates fraud on a transaction that was locally marked completed, auto-block it and refund/preserve balance
+    // Cash in is exempted from fraud detection as per requirements
+    if (type !== 'cash_in' && mlScore !== null && mlScore >= 0.6 && txId) {
       const caseId = `CASE-ML-${Math.floor(1000 + Math.random() * 9000)}`;
+      const amount = Number(payload.amount) || 0;
+
+      // Restore wallet balance so 0.00 GHS is deducted
+      if (result.transaction?.status === 'completed' && ['send', 'cash_out', 'pay_bill', 'buy_goods'].includes(type)) {
+        const restoredBalance = store.getBalance() + amount;
+        store.setBalance(restoredBalance);
+        simEvents.emit('balance:updated', restoredBalance);
+      }
+
+      const blockReason = `Transaction blocked by AI defense: ML fraud risk ${(mlScore * 100).toFixed(0)}%. 0.00 GHS was deducted from your wallet.`;
+
       store.updateTransaction(txId, {
-        status: 'flagged',
+        status: 'blocked',
         mlScore,
         mlRiskLevel,
-        reason: `ML fraud engine detected ${(mlScore * 100).toFixed(0)}% risk probability`,
+        reason: blockReason,
         caseId,
       });
 
@@ -402,7 +450,7 @@ async function executeTransaction(type, payload) {
             label: 'ML Fraud Risk Score',
             description: `Machine learning model flagged this transaction with ${(mlScore * 100).toFixed(0)}% fraud probability`,
             score: mlScore,
-            details: { model: 'fraud_detection_v1', threshold: 0.7 },
+            details: { model: 'fraud_detection_v1', threshold: 0.6 },
           },
         ],
         userProfile: {
@@ -426,10 +474,12 @@ async function executeTransaction(type, payload) {
       }
       simEvents.emit('admin:case:new', newCase);
 
-      result.status = 'flagged';
+      result.status = 'blocked';
+      result.reason = blockReason;
       result.caseId = caseId;
       if (result.transaction) {
-        result.transaction.status = 'flagged';
+        result.transaction.status = 'blocked';
+        result.transaction.reason = blockReason;
         result.transaction.mlScore = mlScore;
         result.transaction.mlRiskLevel = mlRiskLevel;
       }
@@ -460,7 +510,7 @@ async function executeTransaction(type, payload) {
 }
 
 export async function sendMoney(payload) {
-  return executeTransaction('send', payload);
+  return executeTransaction('send_money', payload);
 }
 
 export async function cashOut(payload) {
@@ -576,3 +626,21 @@ function loginLocal(payload) {
     ],
   };
 }
+
+// Attach all endpoint functions onto the api object
+Object.assign(api, {
+  requestOtp,
+  getCurrentUser,
+  signup,
+  login,
+  getBalance,
+  getTransactions,
+  sendMoney,
+  cashOut,
+  cashIn,
+  payBill,
+  buyGoods,
+  getAlerts,
+  markAlertRead,
+});
+

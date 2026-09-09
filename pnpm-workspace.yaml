@@ -1,5 +1,5 @@
 packages:
-  - "apps/*"
+  - "frontend/*"
   - "packages/shared"
 allowBuilds:
   esbuild: true

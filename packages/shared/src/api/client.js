@@ -5,7 +5,7 @@
 
 import axios from 'axios';
 
-const EXPRESS_BASE_URL = 'https://machine-learning-server-3.onrender.com';
+const EXPRESS_BASE_URL = 'http://localhost:5000';
 
 let authToken = null;
 
@@ -45,6 +45,7 @@ export function createApiClient(baseURL) {
     const token = getAuthToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+      config.headers['jwt'] = token;
     }
     return config;
   });

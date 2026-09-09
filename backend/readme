@@ -1,0 +1,122 @@
+# Fraud Detection API
+
+A fraud detection system consisting of a Node.js/Express backend
+and a FastAPI machine-learning service.
+
+## Architecture
+
+- **Node.js + Express** — Main backend API
+- **FastAPI** — Machine learning prediction API
+- **Axios** — Communication between Express and FastAPI
+- **PostgreSQL** — Database
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/username/project.git
+cd project
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+## Environment Variables
+
+Create a `.env` file:
+
+```env
+PORT=5000
+URL=https://machine-learing-fastapi-1.onrender.com
+```
+
+## Running the Application
+
+Start the Express server:
+
+```bash
+npm start
+```
+
+For development:
+
+```bash
+npm run dev
+```
+
+## Register new User
+
+register new account user
+
+` {"fullName": "Aninakwa Desmond", "email": "aninakwa31144@gmail.com", "password": "@mista223", "ghanaCard": "GHA-334444444-3", "location": {"lat": 2.334, "long": -1.344}, "device":"nokia 320"}`
+
+## Account login
+
+Acoount login
+`login  { "email": "aninakwa3144@gmail.com", "password": "@mista223", "ghanaCard": "GHA-334444444-3"}`
+
+## Transaction Account
+
+Transaction account
+`{"amount":1000, "SenderPhone": "233-248490032","receiverPhone": "233-248490032" , "reason":"flagged", "city": "Oda", "country": "Ghana", "location" : {"lat": 10.67777, "long": -4.233}, "device": "nokia 3200" }`
+
+## Machine Learning API
+
+The machine-learning service is hosted on Render.
+
+### Prediction Request
+
+```json
+{
+  "is_new_user": 0,
+  "txn_unusual_location": 0,
+  "txn_unusual_time": 0,
+  "txn_unusual_amount": 0,
+  "device_changed": 0,
+  "ip_mismatch": 0,
+  "has_multiple_anomalies": 0,
+  "sim_device_change": 0,
+  "account_takeover_risk": 0,
+  "fraud_detected": 0,
+  "was_reversed": 0,
+  "was_reported": 0,
+  "fraud_account_takeover": 0,
+  "platform_mtn_momo": 0,
+  "txn_cash_in": 0,
+  "txn_cash_out": 0,
+  "victim_vulnerability": 0,
+  "detection_score": 0
+}
+```
+
+## API Usage
+
+Example using Axios:
+
+```javascript
+const response = await axios.post(`${process.env.URL}/predict`, payload, {
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+console.log(response.data);
+```
+
+## API Documentation
+
+FastAPI automatically provides interactive API documentation at:
+
+`/docs`
+
+## HOSTED_URL
+
+[Click here](https://machine-learning-server-ohnz.onrender.com)
+
+## License
+
+MIT
