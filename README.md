@@ -1,6 +1,6 @@
 # Simulated Mobile Money (MoMo) Fraud Detection & Prevention Ecosystem
 
-An enterprise-grade, multi-tier Mobile Money simulation and real-time fraud defense platform engineered for West African mobile money networks (specifically modeled on Ghana MTN MoMo and the Swipe Pay architecture). The system integrates customer-facing web and mobile applications with an automated Machine Learning (ML) defense engine and a Security Operations Center (SOC) administrative portal.
+An enterprise-grade, multi-tier Mobile Money simulation and real-time fraud defense platform engineered for West African mobile money networks (specifically modeled on Ghana MTN MoMo and the Swipe Pay architecture). The system integrates a customer-facing responsive web application with an automated Machine Learning (ML) defense engine and a Security Operations Center (SOC) administrative portal.
 
 ---
 
@@ -29,11 +29,10 @@ An enterprise-grade, multi-tier Mobile Money simulation and real-time fraud defe
 Mobile Money is the primary financial rail in West Africa, processing billions of dollars in peer-to-peer transfers, merchant payments, and cash withdrawals. However, it is vulnerable to **Account Takeover via SIM Swap (ATOD)**, **credential harvesting**, **unusual geospatial velocity jumps**, and **social engineering anomalies**.
 
 This project provides a full-stack, production-modeled defense platform consisting of:
-1. **Customer Web Application (`frontend/web`)**: A web wallet with biometric liveness scanning, KYC registration with Ghana Card verification, Send Money, Cash Out, and Cash In.
-2. **Customer Mobile Application (`frontend/mobile`)**: A React Native/Expo mobile wallet client featuring simulated hardware telemetry, GPS capture, and device spoofing controls for penetration testing.
-3. **Core Backend API (`backend`)**: Express.js server providing JWT authentication, MongoDB Atlas replication, Haversine geospatial speed algorithms, Z-score transaction volume anomaly analysis, and real-time Socket.io dispatching.
-4. **Machine Learning Inference Engine (`machine-learning-engine`)**: A FastAPI microservice serving an optimized gradient-boosted regressor (`model.sav`) executing inference in under 15ms.
-5. **Admin SOC Governance Portal (`frontend/admin`)**: Real-time analyst portal streaming live transactions, incident triage queues, customer KYC profile inspection, false-positive authorization, and wallet freezing controls.
+1. **Customer Web Application (`frontend/web`)**: A responsive web wallet with biometric liveness scanning, KYC registration with Ghana Card verification, Send Money, Cash Out, Cash In, and an embedded interactive Mobile App Simulator.
+2. **Core Backend API (`backend`)**: Express.js server providing JWT authentication, MongoDB Atlas replication, Haversine geospatial speed algorithms, Z-score transaction volume anomaly analysis, and real-time Socket.io dispatching.
+3. **Machine Learning Inference Engine (`machine-learning-engine`)**: A FastAPI microservice serving an optimized gradient-boosted regressor (`model.sav`) executing inference in under 15ms.
+4. **Admin SOC Governance Portal (`frontend/admin`)**: Real-time analyst portal streaming live transactions, incident triage queues, customer KYC profile inspection, false-positive authorization, and wallet freezing controls.
 
 ---
 
@@ -55,10 +54,9 @@ This project provides a full-stack, production-modeled defense platform consisti
 ### Frontend Applications
 | Component | Technologies |
 | :--- | :--- |
-| **Web Customer Client** | React 18, Vite 6, TailwindCSS, Context API, Lucide Icons |
-| **Admin SOC Portal** | React 18, Vite 6, TailwindCSS, Recharts, Socket.io-Client, Lucide Icons |
-| **Mobile Customer Client** | React Native 0.74, Expo SDK 51, React Navigation, Expo Location |
-| **Shared Monorepo Lib** | Axios, Shared State Store (SimStore), Event Emitters |
+| **Web Customer Client** | React 19, Vite 6, TailwindCSS, Context API, Redux Toolkit, Lucide Icons |
+| **Admin SOC Portal** | React 19, Vite 6, TailwindCSS, Recharts, Socket.io-Client, Lucide Icons |
+| **Shared Monorepo Lib** | Axios, Socket.io-Client, Shared State & Constants |
 
 ### Backend & Microservices
 | Component | Technologies |
@@ -74,8 +72,7 @@ This project provides a full-stack, production-modeled defense platform consisti
 ```mermaid
 flowchart TB
     subgraph Clients["Client Layer"]
-        WC["Customer Web App\n(Port 5173)"]
-        MC["Customer Mobile App\n(Port 8081)"]
+        WC["Customer Web App & Mobile Simulator\n(Port 5173)"]
         AP["Admin SOC Portal\n(Port 5174)"]
     end
 
@@ -98,9 +95,8 @@ flowchart TB
         ATLAS[("MongoDB Atlas Cloud\n(momo_fraud Database)")]
     end
 
-    WC -->|JWT API Requests| AUTH
+    WC -->|JWT API Requests & Telemetry| AUTH
     WC -->|Execute Transaction| TXN
-    MC -->|GPS & Device Telemetry| TXN
     AP -->|Governance Actions| ADMIN
 
     TXN --> GEO
@@ -340,7 +336,7 @@ flowchart TD
 ```bash
 # Clone the repository
 git clone <repository_url>
-cd "Simulated mobile money app (web + mobile client + admin portal)"
+cd "Simulated Mobile Money Platform with Machine Learning Fraud Detection"
 
 # Install Node.js monorepo dependencies
 pnpm install
@@ -378,9 +374,8 @@ NODE_ENV=development
 
 | Service | Port | Local URL | Description |
 | :--- | :---: | :--- | :--- |
-| **Web Customer App** | `5173` | [http://localhost:5173](http://localhost:5173) | User wallet portal (Send, Cash Out, Cash In) |
+| **Web Customer App** | `5173` | [http://localhost:5173](http://localhost:5173) | User wallet portal & built-in Mobile Simulator |
 | **Admin SOC Portal** | `5174` | [http://localhost:5174](http://localhost:5174) | Security analyst dashboard & incident triage |
-| **Mobile Expo Client** | `8081` | [http://localhost:8081](http://localhost:8081) | Mobile client bundler with live GPS simulation |
 | **Core Express API** | `5000` | [http://localhost:5000](http://localhost:5000) | Backend REST API & Socket.io server |
 | **FastAPI ML Engine** | `8000` | [http://localhost:8000/docs](http://localhost:8000/docs) | XGBoost model inference & Swagger docs |
 
@@ -390,7 +385,7 @@ Launch each component in dedicated terminal instances:
 
 ```bash
 # Terminal 1: Python ML Inference Engine
-python -m uvicorn index:app --host 127.0.0.1 --port 8000 --app-dir machine-learning-engine
+python -m uvicorn index:app --reload --host 127.0.0.1 --port 8000 --app-dir machine-learning-engine
 
 # Terminal 2: Core Express Backend
 node backend/index.js
@@ -400,7 +395,4 @@ pnpm dev:web
 
 # Terminal 4: Admin SOC Portal
 pnpm dev:admin
-
-# Terminal 5: Mobile App (Optional / Expo)
-pnpm dev:mobile
 ```

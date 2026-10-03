@@ -500,14 +500,6 @@ export default function FacialVerification() {
               <div className="space-y-2">
                 <button
                   type="button"
-                  onClick={completeVerification}
-                  className="btn-primary w-full py-3 text-xs sm:text-sm font-bold shadow-xs flex items-center justify-center gap-2"
-                >
-                  <span>Verify Face ID Now</span>
-                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">Instant Pass</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => {
                     stopCamera()
                     runFallbackSimulatedScan()

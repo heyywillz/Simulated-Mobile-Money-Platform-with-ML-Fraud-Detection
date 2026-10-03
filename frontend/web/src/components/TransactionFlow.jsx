@@ -9,7 +9,6 @@ import {
   ShieldCheckIcon,
   CheckIcon,
   SparklesIcon,
-  FingerprintIcon,
 } from '@momo/shared/src/components/Icons';
 import { useAppSelector } from '../store/hooks';
 import axios from "axios"
@@ -43,7 +42,6 @@ export default function TransactionFlow({
 
   // Biometric Modal State
   const [isBioModalOpen, setIsBioModalOpen] = useState(false);
-  const [bioModalMode, setBioModalMode] = useState('facial');
   const [bioModalTitle, setBioModalTitle] = useState('Biometric Authorization');
   const [bioModalSubtitle, setBioModalSubtitle] = useState(
     'Authorize this payment with biometrics',
@@ -93,7 +91,7 @@ export default function TransactionFlow({
 
     setCurrentPin(enteredPassword.trim());
     setError(null);
-    setBioModalMode('facial');
+
     setBioModalTitle('Layer 2 Security Check: Biometric Authorization');
     setBioModalSubtitle(
       `Verify your identity via Face ID to release GH₵ ${parsedAmount.toFixed(2)}`,
@@ -105,8 +103,7 @@ export default function TransactionFlow({
 
 
   // Open Direct Biometric on Password Pad if clicked explicitly
-  const openDirectBiometric = (mode = 'facial') => {
-    setBioModalMode('facial');
+  const openDirectBiometric = () => {
     setBioModalTitle('Layer 2 Security Check: Biometric Authorization');
     setBioModalSubtitle(
       `Authorize GH₵ ${parsedAmount.toFixed(2)} with Face ID`,
@@ -115,8 +112,7 @@ export default function TransactionFlow({
   };
 
   // Open Step-Up Biometric
-  const openStepUpBiometric = (mode) => {
-    setBioModalMode(mode);
+  const openStepUpBiometric = () => {
     setBioModalTitle('Security Challenge: Step-Up Biometric Check');
     setBioModalSubtitle(
       'Verify your identity to release this flagged transaction',
@@ -208,8 +204,6 @@ export default function TransactionFlow({
         onFailure={handleBiometricFailure}
         title={bioModalTitle}
         subtitle={bioModalSubtitle}
-        initialMode={bioModalMode}
-        allowModeSwitch={true}
       />
 
       {/* Header */}
@@ -426,7 +420,7 @@ export default function TransactionFlow({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => openDirectBiometric('facial')}
+                  onClick={() => openDirectBiometric()}
                   className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-neutral-700 hover:text-primary-800 rounded-lg hover:bg-neutral-50 border border-neutral-200 transition-colors shadow-2xs"
                 >
                   <svg
@@ -496,7 +490,7 @@ export default function TransactionFlow({
           <div className="w-full space-y-2.5">
             {/* Primary: Face ID */}
             <button
-              onClick={() => openStepUpBiometric('facial')}
+              onClick={() => openStepUpBiometric()}
               className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-xs font-bold"
             >
               <svg

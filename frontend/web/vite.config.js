@@ -12,5 +12,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    watch: {
+      ignored: ['**/node_modules/**', '**/.git/**', '**/Project Researcher Paper/**', '**/backend/**', '**/machine-learning-engine/**'],
+    },
   },
 })

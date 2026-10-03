@@ -402,58 +402,109 @@ async function executeTransaction(type, payload) {
       ? (mlScore >= 0.8 ? 'critical' : mlScore >= 0.6 ? 'high' : mlScore >= 0.3 ? 'medium' : 'low')
       : null;
 
-    // Pass ML data into the local processing so it's stored on the transaction
-    const enrichedPayload = { ...payload, mlScore, mlRiskLevel, channel: normalizedType, type: normalizedType };
+    // Check whether the server blocked this transaction or ML score flagged it
+    // Cash in is exempted from fraud detection as per requirements
+    const isServerBlocked =
+      data?.data?.status === 'blocked' ||
+      data?.status === 'blocked' ||
+      data?.isDeducted === false ||
+      Boolean(data?.case && data.case.status === 'open');
+
+    const isMlHighRisk = mlScore !== null && mlScore >= 0.6;
+    const shouldBlock = type !== 'cash_in' && (isServerBlocked || isMlHighRisk);
+
+    const serverReason = data?.case?.transaction?.reason || data?.data?.reason;
+    const resolvedBlockReason =
+      serverReason ||
+      (isServerBlocked && (!mlScore || mlScore < 0.6)
+        ? 'Transaction blocked by anomaly defense. 0.00 GHS deducted from your balance.'
+        : `Transaction blocked by AI defense: ML fraud risk ${mlScore !== null ? (mlScore * 100).toFixed(0) : '60'}%. 0.00 GHS was deducted from your wallet.`);
+
+    // Pass ML and block data into local processing so it's stored on the transaction and zero-deduction is enforced
+    const enrichedPayload = {
+      ...payload,
+      mlScore,
+      mlRiskLevel,
+      channel: normalizedType,
+      type: normalizedType,
+      isBlocked: shouldBlock,
+      serverBlocked: isServerBlocked,
+      reason: shouldBlock ? resolvedBlockReason : undefined,
+    };
 
     // Process locally to track balance and history
     const result = store.processTransaction(type, enrichedPayload);
     const txId = result.transactionId || result.transaction?.id;
 
-    // If ML score indicates fraud on a transaction that was locally marked completed, auto-block it and refund/preserve balance
-    // Cash in is exempted from fraud detection as per requirements
-    if (type !== 'cash_in' && mlScore !== null && mlScore >= 0.6 && txId) {
-      const caseId = `CASE-ML-${Math.floor(1000 + Math.random() * 9000)}`;
+    if (shouldBlock && txId) {
       const amount = Number(payload.amount) || 0;
 
-      // Restore wallet balance so 0.00 GHS is deducted
+      // Model A Zero-Deduction Guarantee:
+      // If store.processTransaction optimistically deducted the amount locally, restore it immediately
       if (result.transaction?.status === 'completed' && ['send', 'cash_out', 'pay_bill', 'buy_goods'].includes(type)) {
-        const restoredBalance = store.getBalance() + amount;
+        const rawStoreBal = store.balance !== undefined ? store.balance : (store.getBalance()?.available ?? 10000);
+        const currentBalanceNum = Number(rawStoreBal) || 0;
+        const restoredBalance = currentBalanceNum + amount;
         store.setBalance(restoredBalance);
-        simEvents.emit('balance:updated', restoredBalance);
+        simEvents.emit('balance:updated', store.getBalance());
       }
 
-      const blockReason = `Transaction blocked by AI defense: ML fraud risk ${(mlScore * 100).toFixed(0)}%. 0.00 GHS was deducted from your wallet.`;
+      const caseId =
+        data?.case?.caseId ||
+        data?.case?.id ||
+        `CASE-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const resolvedRiskLevel =
+        data?.case?.riskLevel ||
+        (mlRiskLevel && mlRiskLevel !== 'low' ? mlRiskLevel : 'high');
+
+      const serverReason = data?.case?.transaction?.reason || data?.data?.reason;
+      const blockReason =
+        serverReason ||
+        (isServerBlocked && (!mlScore || mlScore < 0.6)
+          ? 'Transaction blocked by anomaly defense. 0.00 GHS deducted from your balance.'
+          : `Transaction blocked by AI defense: ML fraud risk ${(mlScore * 100).toFixed(0)}%. 0.00 GHS was deducted from your wallet.`);
+
+      const finalMlScore = mlScore ?? (data?.data?.fraudScore ? parseFloat(data.data.fraudScore) : 0.05);
 
       store.updateTransaction(txId, {
         status: 'blocked',
-        mlScore,
-        mlRiskLevel,
+        mlScore: finalMlScore,
+        mlRiskLevel: resolvedRiskLevel,
         reason: blockReason,
         caseId,
       });
 
-      // Create fraud case for admin
+      // Synchronize/create fraud case for admin portal
       const updatedTx = store.getAllTransactions().find((t) => t.id === txId);
       const newCase = {
         id: caseId,
+        caseId,
         transactionId: txId,
         userId: user?.id,
-        userName: user?.fullName || 'Unknown',
-        userPhone: user?.phoneNumber || '',
-        detectionType: 'transaction_anomaly',
-        riskLevel: mlRiskLevel,
+        userName: user?.fullName || data?.case?.userName || 'Unknown',
+        userPhone: user?.phoneNumber || data?.case?.userPhone || '',
+        detectionType: data?.case?.detectionType || 'transaction_anomaly',
+        riskLevel: resolvedRiskLevel,
         status: 'open',
-        transaction: updatedTx || result.transaction,
-        signals: [
+        transaction: {
+          ...(data?.case?.transaction || updatedTx || result.transaction || {}),
+          id: txId,
+          status: 'blocked',
+          reason: blockReason,
+          mlScore: finalMlScore,
+          mlRiskLevel: resolvedRiskLevel,
+        },
+        signals: data?.case?.signals || [
           {
             type: 'ml_score',
             label: 'ML Fraud Risk Score',
-            description: `Machine learning model flagged this transaction with ${(mlScore * 100).toFixed(0)}% fraud probability`,
-            score: mlScore,
+            description: `Machine learning model flagged this transaction with ${(finalMlScore * 100).toFixed(0)}% fraud probability`,
+            score: finalMlScore,
             details: { model: 'fraud_detection_v1', threshold: 0.6 },
           },
         ],
-        userProfile: {
+        userProfile: data?.case?.userProfile || {
           avgTransactionAmount: 200,
           minTransactionAmount: 10,
           maxTransactionAmount: 500,
@@ -464,11 +515,12 @@ async function executeTransaction(type, payload) {
           accountAge: 90,
           totalTransactions: store.getAllTransactions().length,
         },
-        analystNotes: [],
-        createdAt: new Date().toISOString(),
+        analystNotes: data?.case?.analystNotes || [],
+        createdAt: data?.case?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      store.cases = [newCase, ...store.cases];
+
+      store.cases = [newCase, ...store.cases.filter((c) => c.id !== caseId && c.caseId !== caseId)];
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('momo_sim_cases', JSON.stringify(store.cases));
       }
@@ -480,19 +532,21 @@ async function executeTransaction(type, payload) {
       if (result.transaction) {
         result.transaction.status = 'blocked';
         result.transaction.reason = blockReason;
-        result.transaction.mlScore = mlScore;
-        result.transaction.mlRiskLevel = mlRiskLevel;
+        result.transaction.mlScore = finalMlScore;
+        result.transaction.mlRiskLevel = resolvedRiskLevel;
       }
     } else if (mlScore !== null && txId) {
       // Attach ML score even for non-flagged transactions
       store.updateTransaction(txId, { mlScore, mlRiskLevel });
     }
 
-    // If server returned updated balance, synchronize store balance with it
-    if (data && typeof data.balance === 'number') {
-      store.setBalance(data.balance);
-    } else if (data && data.user && typeof data.user.balance === 'number') {
-      store.setBalance(data.user.balance);
+    // If server returned updated balance on successful completed transaction, synchronize store balance with it
+    if (!shouldBlock) {
+      if (data && typeof data.balance === 'number') {
+        store.setBalance(data.balance);
+      } else if (data && data.user && typeof data.user.balance === 'number') {
+        store.setBalance(data.user.balance);
+      }
     }
 
     if (mlScore !== null) {

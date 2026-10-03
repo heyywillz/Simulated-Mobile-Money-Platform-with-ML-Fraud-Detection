@@ -6,19 +6,14 @@
   "scripts": {
     "dev:web": "pnpm --filter @momo/web dev",
     "dev:admin": "pnpm --filter @momo/admin dev",
-    "dev:mobile": "pnpm --filter @momo/mobile start",
     "dev:backend": "node backend/index.js",
     "dev:ml": "python -m uvicorn index:app --reload --port 8000 --app-dir machine-learning-engine",
     "dev": "pnpm run dev:web",
     "build:web": "pnpm --filter @momo/web build",
     "build:admin": "pnpm --filter @momo/admin build",
-    "clean": "pnpm -r exec rm -rf node_modules dist .expo"
+    "clean": "pnpm -r exec rm -rf node_modules dist"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "devDependencies": {
-    "babel-plugin-syntax-hermes-parser": "^0.37.0",
-    "babel-preset-expo": "^57.0.10"
   }
 }

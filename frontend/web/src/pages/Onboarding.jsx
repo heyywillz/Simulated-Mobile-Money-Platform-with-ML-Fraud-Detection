@@ -1212,22 +1212,6 @@ export default function Onboarding() {
                       type="button"
                       onClick={() => {
                         if (onbAutoTimerRef.current) clearTimeout(onbAutoTimerRef.current);
-                        if (faceTrackerRef.current) faceTrackerRef.current.stop();
-                        stopCamera();
-                        setFaceProgress(100);
-                        setFaceScanState('passed');
-                        playBiometricSound('success');
-                        triggerHaptic('success');
-                      }}
-                      className="btn-primary w-full py-3 text-xs sm:text-sm font-bold shadow-xs flex items-center justify-center gap-2"
-                    >
-                      <span>Verify Face ID Now</span>
-                      <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">Instant Pass</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (onbAutoTimerRef.current) clearTimeout(onbAutoTimerRef.current);
                         stopCamera();
                         runFallbackSimulatedScan();
                       }}
@@ -1406,44 +1390,44 @@ export default function Onboarding() {
                 </div>
 
                 {/* Account Summary Card */}
-                <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200 text-left space-y-3">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={profilePicture}
-                      alt={fullName}
-                      className="w-12 h-12 rounded-full object-cover border-2 border-primary-800"
-                    />
+                <div className="p-5 bg-neutral-50 rounded-2xl border border-neutral-200 text-left space-y-4">
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <div className="relative">
+                      <img
+                        src={profilePicture}
+                        alt={fullName}
+                        className="w-16 h-16 rounded-full object-cover border-[3px] border-green-500 shadow-sm"
+                      />
+                      <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                        <CheckIcon size={11} color="#fff" />
+                      </span>
+                    </div>
                     <div>
-                      <h4 className="text-sm font-bold text-neutral-900">
+                      <h4 className="text-base font-bold text-neutral-900">
                         {fullName}
                       </h4>
                       <p className="text-xs text-neutral-500 font-mono">
                         {phoneNumber}
                       </p>
-                      <p className="text-[11px] text-neutral-400">{email}</p>
+                      <p className="text-[11px] text-neutral-400 mt-0.5">{email}</p>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-neutral-200/60 grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="p-2 bg-white rounded-xl border border-neutral-100">
-                      <span className="text-neutral-400 block font-bold uppercase text-[9px]">
-                        Starting Balance
-                      </span>
-                      <span className="text-sm font-black text-primary-800 font-mono">
-                        GH₵ 10,000.00
-                      </span>
-                    </div>
-                    <div className="p-2 bg-white rounded-xl border border-neutral-100">
-                      <span className="text-neutral-400 block font-bold uppercase text-[9px]">
+                  <div className="flex items-center justify-between bg-white rounded-xl p-3 border border-neutral-100">
+                    <div>
+                      <span className="text-neutral-400 block font-bold uppercase text-[9px] tracking-wider">
                         KYC Status
                       </span>
                       <span className="text-sm font-bold text-green-700">
                         Verified
                       </span>
                     </div>
+                    <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                      ✓ Complete
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-[10px] text-green-700 font-bold bg-green-50 p-2 rounded-xl border border-green-200">
+                  <div className="flex items-center gap-2 text-[10px] text-green-700 font-bold bg-green-50 p-2.5 rounded-xl border border-green-200">
                     <ShieldCheckIcon size={14} color="#15803d" />
                     <span>
                       Facial Liveness Biometric Defense Active & Enrolled

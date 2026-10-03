@@ -10,7 +10,7 @@ import {
   requestWebAuthnBiometric,
   RealtimeFaceTracker,
 } from '@momo/shared'
-import { ShieldCheckIcon, CheckIcon, FingerprintIcon } from '@momo/shared/src/components/Icons'
+import { ShieldCheckIcon, CheckIcon } from '@momo/shared/src/components/Icons'
 
 export default function BiometricModal({
   isOpen,
@@ -19,19 +19,17 @@ export default function BiometricModal({
   onFailure,
   title = 'Layer 2 Biometric Identity Verification',
   subtitle = 'Comparing biometric telemetry with registered wallet profile',
-  initialMode = 'facial',
-  allowModeSwitch = true,
   autoStart = true,
 }) {
   const { user } = useAuth()
 
-  const [mode, setMode] = useState(initialMode)
+  const [mode, setMode] = useState('facial')
   const [status, setStatus] = useState('idle')
   const [progress, setProgress] = useState(0)
   const [matchScore, setMatchScore] = useState(0)
   const [cameraStream, setCameraStream] = useState(null)
   const [hasCamera, setHasCamera] = useState(null)
-  const [isPressingSensor, setIsPressingSensor] = useState(false)
+
   const [hasWebAuthn, setHasWebAuthn] = useState(false)
   const [livenessStage, setLivenessStage] = useState('position')
   const [errorMessage, setErrorMessage] = useState(null)
@@ -48,7 +46,7 @@ export default function BiometricModal({
   const bioAutoTimerRef = useRef(null)
 
   const enrolledFaceToken = user?.facialTemplate ?? 'BIO-FACE-8829-GH'
-  const enrolledFpToken = user?.fingerprintTemplate ?? 'BIO-FP-9941-GH'
+
   const enrolledName = user?.fullName ?? 'Registered Wallet Owner'
   const enrolledPhoto = user?.profilePicture
 
@@ -100,18 +98,14 @@ export default function BiometricModal({
       hasCompletedRef.current = false
       isAnalyzingRef.current = false
       progressRef.current = 0
-      setMode(initialMode)
+      setMode('facial')
       setStatus('idle')
       setProgress(0)
       setMatchScore(0)
       setErrorMessage(null)
-      setIsPressingSensor(false)
-      isWebAuthnAvailable().then(setHasWebAuthn)
 
       if (autoStart) {
-        if (initialMode === 'facial') {
-          startFacialScan()
-        }
+        startFacialScan()
       }
     } else {
       stopCamera()
@@ -119,7 +113,7 @@ export default function BiometricModal({
     return () => {
       stopCamera()
     }
-  }, [isOpen, initialMode])
+  }, [isOpen])
 
   // Clean up on unmount
   useEffect(() => {
@@ -129,21 +123,7 @@ export default function BiometricModal({
     }
   }, [stopCamera])
 
-  // Handle switching tabs
-  const handleSwitchMode = (newMode) => {
-    stopCamera()
-    hasCompletedRef.current = false
-    isAnalyzingRef.current = false
-    setMode(newMode)
-    setStatus('idle')
-    setProgress(0)
-    setMatchScore(0)
-    setErrorMessage(null)
-    setIsPressingSensor(false)
-    if (newMode === 'facial') {
-      startFacialScan()
-    }
-  }
+
 
   // ─── Attach Camera Stream & Initialize Face Tracker on Mount ───────
   useEffect(() => {
@@ -323,92 +303,7 @@ export default function BiometricModal({
     }, 40)
   }
 
-  // ─── FINGERPRINT VERIFICATION & COMPARISON ────────────────────────────
 
-  const handleSensorPressStart = () => {
-    if (status === 'success' || status === 'analyzing' || hasCompletedRef.current || isAnalyzingRef.current) return
-    setIsPressingSensor(true)
-    setStatus('scanning')
-    setErrorMessage(null)
-    playBiometricSound('tick')
-    triggerHaptic('medium')
-
-    let currentProg = 0
-    if (holdIntervalRef.current) clearInterval(holdIntervalRef.current)
-
-    holdIntervalRef.current = setInterval(() => {
-      currentProg += 4
-      setProgress(Math.min(currentProg, 100))
-      setMatchScore(Math.floor((currentProg / 100) * 99.2))
-
-      if (currentProg % 20 === 0) {
-        playBiometricSound('tick')
-        triggerHaptic('light')
-      }
-
-      if (currentProg >= 100) {
-        if (holdIntervalRef.current) {
-          clearInterval(holdIntervalRef.current)
-          holdIntervalRef.current = null
-        }
-        if (isAnalyzingRef.current || hasCompletedRef.current) return
-        isAnalyzingRef.current = true
-        setIsPressingSensor(false)
-        setStatus('analyzing')
-        setMatchScore(99.4)
-
-        setTimeout(() => {
-          setStatus('success')
-          playBiometricSound('success')
-          triggerHaptic('success')
-
-          setTimeout(() => {
-            triggerSuccess('biometric')
-          }, 600)
-        }, 500)
-      }
-    }, 35)
-  }
-
-  const handleSensorPressEnd = () => {
-    if (status === 'scanning' && progress < 100) {
-      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current)
-      setIsPressingSensor(false)
-      setStatus('idle')
-      setProgress(0)
-      setMatchScore(0)
-      setErrorMessage('Hold your finger steady on the sensor to complete comparison')
-      triggerHaptic('error')
-    }
-  }
-
-  // Device native WebAuthn
-  const handleNativeWebAuthn = async () => {
-    if (isAnalyzingRef.current || hasCompletedRef.current) return
-    setStatus('scanning')
-    setErrorMessage(null)
-    playBiometricSound('scan')
-    try {
-      const ok = await requestWebAuthnBiometric('Swipe Pay Ghana Biometric Authentication')
-      if (ok) {
-        if (isAnalyzingRef.current || hasCompletedRef.current) return
-        isAnalyzingRef.current = true
-        setStatus('success')
-        setMatchScore(100)
-        playBiometricSound('success')
-        triggerHaptic('success')
-        setTimeout(() => {
-          triggerSuccess('biometric')
-        }, 600)
-      } else {
-        setStatus('idle')
-        setErrorMessage('Device biometric prompt dismissed. Use the touch sensor below.')
-      }
-    } catch {
-      setStatus('idle')
-      setErrorMessage('WebAuthn unavailable on this browser. Use touch sensor.')
-    }
-  }
 
   // Simulate Mismatch (Imposter Face / Unregistered Finger)
   const handleSimulateMismatch = () => {
@@ -470,7 +365,7 @@ export default function BiometricModal({
             <div>
               <span className="font-bold text-neutral-800 text-[11px]">{enrolledName}</span>
               <span className="text-[10px] text-neutral-400 block font-mono">
-                {mode === 'facial' ? `Face Ref: ${enrolledFaceToken}` : `Fingerprint Ref: ${enrolledFpToken}`}
+                {`Face Ref: ${enrolledFaceToken}`}
               </span>
             </div>
           </div>
@@ -479,34 +374,7 @@ export default function BiometricModal({
           </span>
         </div>
 
-        {/* Mode Switch Tabs (if enabled) */}
-        {allowModeSwitch && (
-          <div className="flex border-b border-neutral-100 bg-neutral-50/70 p-1.5 gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleSwitchMode('facial')}
-              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                mode === 'facial'
-                  ? 'bg-white text-primary-800 shadow-xs border border-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-800'
-              }`}
-            >
-              <span>Face ID (Camera)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSwitchMode('fingerprint')}
-              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                mode === 'fingerprint'
-                  ? 'bg-white text-primary-800 shadow-xs border border-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-800'
-              }`}
-            >
-              <FingerprintIcon size={16} color={mode === 'fingerprint' ? '#8A0F13' : '#6b7280'} />
-              <span>Touch Fingerprint</span>
-            </button>
-          </div>
-        )}
+
 
         {/* Modal Body */}
         <div className="p-6 text-center">
@@ -715,129 +583,7 @@ export default function BiometricModal({
             </div>
           )}
 
-          {/* ═════════════════════════ FINGERPRINT MODE ═════════════════════════ */}
-          {mode === 'fingerprint' && (
-            <div className="space-y-4">
-              {/* Interactive Press-and-Hold Touch Sensor HUD */}
-              <div className="relative mx-auto w-44 h-44 flex items-center justify-center">
-                <button
-                  type="button"
-                  onMouseDown={handleSensorPressStart}
-                  onMouseUp={handleSensorPressEnd}
-                  onTouchStart={handleSensorPressStart}
-                  onTouchEnd={handleSensorPressEnd}
-                  disabled={status === 'success' || status === 'analyzing'}
-                  className={`w-36 h-36 rounded-3xl border-4 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 select-none shadow-md ${
-                    status === 'success'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 scale-105'
-                      : isPressingSensor
-                      ? 'border-primary-600 bg-red-50 text-primary-800 scale-95 shadow-inner'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-primary-300 hover:bg-neutral-100'
-                  }`}
-                  style={{ touchAction: 'none' }}
-                >
-                  {/* Concentric Ultrasonic Pulse Rings when pressing */}
-                  {isPressingSensor && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-24 h-24 rounded-full border-2 border-red-500/40 animate-ping" />
-                      <div className="w-16 h-16 rounded-full border-2 border-red-600/60 animate-pulse" />
-                    </div>
-                  )}
 
-                  {status === 'success' ? (
-                    <div className="flex flex-col items-center animate-scale-in">
-                      <CheckIcon size={44} color="#059669" />
-                      <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 mt-1">Fingerprint Matched</span>
-                      <span className="text-[9px] font-mono text-emerald-600 font-bold">99.4% Similarity</span>
-                    </div>
-                  ) : (
-                    <>
-                      <FingerprintIcon
-                        size={54}
-                        color={isPressingSensor ? '#8A0F13' : status === 'failed' ? '#dc2626' : '#525252'}
-                      />
-                      <span className="text-[10px] font-bold uppercase tracking-wider mt-1.5">
-                        {isPressingSensor ? `${progress}% Match` : 'Press & Hold'}
-                      </span>
-                    </>
-                  )}
-                </button>
-
-                {/* Circular Progress Ring on Hold */}
-                {isPressingSensor && (
-                  <svg className="absolute inset-0 w-44 h-44 -rotate-90 pointer-events-none" viewBox="0 0 176 176">
-                    <circle
-                      cx="88"
-                      cy="88"
-                      r="82"
-                      fill="none"
-                      stroke="#8A0F13"
-                      strokeWidth="4"
-                      strokeDasharray={`${2 * Math.PI * 82}`}
-                      strokeDashoffset={`${2 * Math.PI * 82 * (1 - progress / 100)}`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                )}
-              </div>
-
-              {/* Status Message */}
-              <div>
-                <h4 className="text-base font-black text-neutral-900">
-                  {status === 'idle' && 'Touch & Hold Fingerprint Sensor'}
-                  {isPressingSensor && `Comparing ridge minutiae with ${enrolledFpToken}...`}
-                  {status === 'analyzing' && 'Biometric Ridge Match Confirmed ✓'}
-                  {status === 'success' && `Fingerprint Matched: ${enrolledName}`}
-                  {status === 'failed' && 'Sensor Read / Mismatch Failed'}
-                </h4>
-                <p className="text-xs text-neutral-500 mt-1 max-w-xs mx-auto">
-                  {isPressingSensor
-                    ? 'Keep finger pressed firmly until biometric match reaches 100%.'
-                    : `Press and hold sensor to verify identity against enrolled wallet credential.`}
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-2 space-y-2">
-                {hasWebAuthn && status !== 'success' && (
-                  <button
-                    type="button"
-                    onClick={handleNativeWebAuthn}
-                    className="w-full py-2.5 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors border border-neutral-200"
-                  >
-                    <FingerprintIcon size={16} color="#171717" />
-                    <span>Use System Touch ID / Windows Hello</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isAnalyzingRef.current || hasCompletedRef.current) return
-                    isAnalyzingRef.current = true
-                    if (holdIntervalRef.current) {
-                      clearInterval(holdIntervalRef.current)
-                      holdIntervalRef.current = null
-                    }
-                    setIsPressingSensor(false)
-                    setStatus('analyzing')
-                    setMatchScore(99.4)
-                    setTimeout(() => {
-                      setStatus('success')
-                      playBiometricSound('success')
-                      triggerHaptic('success')
-                      setTimeout(() => {
-                        triggerSuccess('biometric')
-                      }, 500)
-                    }, 300)
-                  }}
-                  className="text-xs text-neutral-400 hover:text-neutral-700 font-semibold underline block mx-auto"
-                >
-                  Match Enrolled Fingerprint (Demo Pass)
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Footer Comparison & Simulation Testing */}
           <div className="mt-5 pt-4 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-400">

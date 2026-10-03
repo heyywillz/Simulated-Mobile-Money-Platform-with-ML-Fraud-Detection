@@ -11,7 +11,6 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import swipePayLogo from '../assets/swipe-pay-logo.png'
 import {
-  ShieldCheckIcon,
   SparklesIcon,
   ZapIcon,
   FingerprintIcon,
@@ -115,9 +114,6 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-white/15 text-[10px] text-white/70">
-            Regulated Mobile Money Platform • 256-bit SSL Protection
-          </div>
         </div>
 
         {/* Right Side: Auth Form */}
@@ -227,12 +223,6 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="p-2 bg-neutral-50 rounded-xl border border-neutral-200/80 text-[10px] text-neutral-600 flex items-start gap-1.5 leading-relaxed">
-              <ShieldCheckIcon size={14} className="text-primary-800 shrink-0 mt-0.5" />
-              <span>
-                <strong>Zero Trust Protocol:</strong> Passwords authorize identity; your chosen biometric key authorizes your active session.
-              </span>
-            </div>
 
             <div className="text-center pt-2 border-t border-neutral-100">
               <p className="text-xs text-neutral-500">

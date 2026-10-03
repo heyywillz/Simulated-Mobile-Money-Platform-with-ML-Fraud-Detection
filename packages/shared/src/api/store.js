@@ -268,10 +268,16 @@ export class SimStore {
     let receiverPhone = payload.recipientPhone || payload.receiver || payload.agentCode || payload.merchantCode || payload.biller || '0240000000';
     let receiverName = payload.receiverName || payload.biller || receiverPhone;
 
-    // Simulated fraud check
+    // Simulated and server-indicated fraud/anomaly check
+    const isPayloadBlocked = Boolean(
+      payload.isBlocked ||
+      payload.serverBlocked ||
+      payload.status === 'blocked' ||
+      (type !== 'cash_in' && payload.mlScore !== null && payload.mlScore !== undefined && payload.mlScore >= 0.6)
+    );
     const isHighAmount = amount > 4000;
     const isAnomalyCity = payload.location?.city === 'Tamale' || payload.location?.city === 'Lagos' || payload.location?.city === 'London';
-    const isFlagged = isHighAmount || (amount > 2000 && isAnomalyCity);
+    const isFlagged = isPayloadBlocked || isHighAmount || (amount > 2000 && isAnomalyCity);
 
     const txId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     let status = isFlagged ? 'blocked' : 'completed';
@@ -280,7 +286,9 @@ export class SimStore {
 
     if (isFlagged) {
       caseId = `CASE-SIM-${Math.floor(1000 + Math.random() * 9000)}`;
-      reason = isHighAmount
+      reason = isPayloadBlocked
+        ? (payload.reason || 'Transaction blocked by AI defense. 0.00 GHS deducted from your balance.')
+        : isHighAmount
         ? 'Transaction blocked by AI fraud defense: High value anomaly. 0.00 GHS deducted from your balance.'
         : 'Transaction blocked by AI fraud defense: Unusual location or pattern. 0.00 GHS deducted from your balance.';
     }

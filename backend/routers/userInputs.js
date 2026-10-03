@@ -78,6 +78,7 @@ userInputs.post('/', [authUser], async (req, res) => {
       console.log('Duplicate transaction detected within 4s window. Returning existing transaction record.');
       return res.status(200).json({
         data: recentDuplicate,
+        balance: original_user?.balance ?? null,
         status: { fraud_risk_score: parseFloat(recentDuplicate.fraudScore) || 0.05 },
         case: null,
         isDeducted: true,
@@ -214,22 +215,54 @@ userInputs.post('/', [authUser], async (req, res) => {
       (transaction) => transaction.amount,
     );
     const current_transaction = all_transaction[0];
-    const previous_transactionArray = all_transaction.slice(0, -1);
+    const previous_transactionArray = all_transaction.slice(1);
 
-    if (all_transaction.length > 3) {
+    if (previous_transactionArray.length >= 1) {
       const anomalyScore = abNormalTransaction({
         transactionsArray: previous_transactionArray,
         currentAmount: current_transaction,
       });
 
-      if (anomalyScore >= 3 || anomalyScore <= -2) {
+      const prevAvg =
+        previous_transactionArray.reduce((sum, val) => sum + val, 0) /
+        previous_transactionArray.length;
+
+      if (
+        anomalyScore >= 3 ||
+        anomalyScore <= -2 ||
+        current_transaction > 4000 ||
+        (current_transaction >= 500 && current_transaction >= prevAvg * 4)
+      ) {
         user_inputObject['txn_unusual_amount'] = 1;
       }
-      console.log('transaction anomaly score:', anomalyScore);
+      console.log('transaction anomaly score:', anomalyScore, 'unusual_amount:', user_inputObject['txn_unusual_amount']);
+    }
+
+    // Activate composite flags for Account Takeover and Multiple Anomalies
+    const isAtodActive =
+      user_inputObject['device_changed'] === 1 &&
+      user_inputObject['txn_unusual_location'] === 1;
+
+    if (isAtodActive) {
+      user_inputObject['account_takeover_risk'] = 1;
+      user_inputObject['fraud_account_takeover'] = 1;
+    }
+
+    const anomalySignalCount =
+      (user_inputObject['device_changed'] === 1 ? 1 : 0) +
+      (user_inputObject['txn_unusual_location'] === 1 ? 1 : 0) +
+      (user_inputObject['txn_unusual_amount'] === 1 ? 1 : 0) +
+      (user_inputObject['txn_unusual_time'] === 1 ? 1 : 0);
+
+    if (anomalySignalCount >= 2) {
+      user_inputObject['has_multiple_anomalies'] = 1;
+    }
+
+    if (anomalySignalCount >= 1) {
+      user_inputObject['detection_score'] = 1;
     }
 
     console.log('all transaction', all_transaction);
-
     console.log('output feed', user_inputObject);
 
     let new_container = {};
@@ -323,29 +356,48 @@ userInputs.post('/', [authUser], async (req, res) => {
     // Full fraud scoring & zero-deduction Model A auto-blocking apply to send_money & cash_out.
     let isHighRisk = false;
     let riskLevel = 'low';
+    let blockReason = 'Transaction completed';
 
     if (isCashIn) {
       normalizedScore = 0.01;
       riskLevel = 'low';
       isHighRisk = false;
     } else {
+      const hasAmountAnomaly = user_inputObject['txn_unusual_amount'] === 1;
+      const hasDeviceAndLocationAnomaly =
+        user_inputObject['device_changed'] === 1 && user_inputObject['txn_unusual_location'] === 1;
+
       isHighRisk =
         normalizedScore >= 0.60 ||
-        user_inputObject['txn_unusual_amount'] === 1 ||
-        (user_inputObject['device_changed'] === 1 && user_inputObject['txn_unusual_location'] === 1);
+        hasAmountAnomaly ||
+        hasDeviceAndLocationAnomaly;
 
-      riskLevel =
-        normalizedScore >= 0.8
-          ? 'critical'
-          : normalizedScore >= 0.6
-          ? 'high'
-          : normalizedScore >= 0.3
-          ? 'medium'
-          : 'low';
+      if (normalizedScore >= 0.80 || (hasAmountAnomaly && hasDeviceAndLocationAnomaly)) {
+        riskLevel = 'critical';
+      } else if (normalizedScore >= 0.60 || isHighRisk) {
+        riskLevel = 'high';
+      } else if (normalizedScore >= 0.30) {
+        riskLevel = 'medium';
+      } else {
+        riskLevel = 'low';
+      }
+
+      if (hasDeviceAndLocationAnomaly && hasAmountAnomaly) {
+        blockReason = `Security defense: Account takeover and abnormal outflow spike detected (${(normalizedScore * 100).toFixed(0)}% risk). 0.00 GHS deducted.`;
+      } else if (hasDeviceAndLocationAnomaly) {
+        blockReason = `Security defense: Account takeover detected from unrecognized device and location jump (${(normalizedScore * 100).toFixed(0)}% risk). 0.00 GHS deducted.`;
+      } else if (hasAmountAnomaly) {
+        blockReason = `Transaction anomaly defense: Unusual amount pattern detected (${(normalizedScore * 100).toFixed(0)}% risk). 0.00 GHS deducted.`;
+      } else if (isHighRisk) {
+        blockReason = `Automated ML fraud defense: ${(normalizedScore * 100).toFixed(0)}% risk. 0.00 GHS deducted.`;
+      }
     }
 
     new_userInputs.fraudScore = String(normalizedScore);
     new_userInputs.status = isHighRisk ? 'blocked' : 'completed';
+    if (isHighRisk) {
+      new_userInputs.reason = blockReason;
+    }
     await new_userInputs.save();
 
     // Adjust user balance in MongoDB Atlas if transaction succeeded (not high-risk fraud block)
@@ -361,7 +413,10 @@ userInputs.post('/', [authUser], async (req, res) => {
     let createdCase = null;
     if (isHighRisk) {
       const caseId = `CASE-${Date.now().toString().slice(-4)}-${Math.floor(1000 + Math.random() * 9000)}`;
-      const detectionType = user_inputObject['device_changed'] === 1 ? 'atod' : 'transaction_anomaly';
+      const detectionType =
+        user_inputObject['device_changed'] === 1 && user_inputObject['txn_unusual_location'] === 1
+          ? 'atod'
+          : 'transaction_anomaly';
 
       const signals = [];
       if (user_inputObject['device_changed'] === 1) {
@@ -396,7 +451,12 @@ userInputs.post('/', [authUser], async (req, res) => {
         label: 'FastAPI ML Fraud Risk Score',
         description: `XGBoost model evaluated this ${channel === 'cash_out' ? 'cash-out' : 'transfer'} with ${(normalizedScore * 100).toFixed(1)}% fraud probability`,
         score: normalizedScore,
-        details: { model: 'xgboost_regressor_v1', rawScore },
+        details: {
+          model: 'xgboost_regressor_v1',
+          rawScore,
+          calibrated: mlStatus?.calibrated ?? false,
+          calibrationReason: mlStatus?.calibration_reason ?? null,
+        },
       });
 
       createdCase = await Case.create({
@@ -420,7 +480,7 @@ userInputs.post('/', [authUser], async (req, res) => {
           status: 'blocked',
           mlScore: normalizedScore,
           mlRiskLevel: riskLevel,
-          reason: `Automated ML fraud defense: ${(normalizedScore * 100).toFixed(0)}% risk. 0.00 GHS deducted.`,
+          reason: blockReason,
           caseId,
           location: {
             latitude: parseFloat(new_userInputs.location?.lat) || 5.6037,

@@ -1,12 +1,9 @@
 function abNormalTransaction({ transactionsArray, currentAmount }) {
-  console.log('start');
-  console.log(
-    'transactionsArray',
-    transactionsArray,
-    'currentAmount',
-    currentAmount,
-  );
-  const amounts = transactionsArray;
+  const amounts = (transactionsArray || [])
+    .map((a) => Number(a))
+    .filter((a) => !isNaN(a) && a > 0);
+
+  if (amounts.length === 0) return 0;
 
   const average =
     amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
@@ -16,8 +13,15 @@ function abNormalTransaction({ transactionsArray, currentAmount }) {
     amounts.length;
 
   const standardDeviation = Math.sqrt(variance);
+  const currentAmountValue = Number(currentAmount) || 0;
 
-  const currentAmountValue = currentAmount;
+  // If all previous transactions were identical (variance == 0)
+  if (standardDeviation === 0) {
+    if (currentAmountValue >= average * 3 && currentAmountValue > 500) {
+      return 5; // Clear outlier spike
+    }
+    return currentAmountValue === average ? 0 : 1;
+  }
 
   const zScore = (currentAmountValue - average) / standardDeviation;
 
@@ -25,6 +29,7 @@ function abNormalTransaction({ transactionsArray, currentAmount }) {
     average,
     standardDeviation,
     zScore,
+    currentAmountValue,
   });
 
   return zScore;
